@@ -1,0 +1,1100 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+```{r}
+#packages
+library(sqldf)
+library(dplyr)
+
+
+
+
+```
+
+```{r}
+pitches <- read.csv('C:\\Users\\Nick\\UCSB Baseball\\All_College_TM_19_22.csv')
+```
+
+
+Add a column that specifies how many pitches a pitcher has thrown
+```{r}
+
+pitches$pitch_count <- with(pitches, ave(seq_along(paste(GameID, PitcherId)), paste(GameID, PitcherId), FUN = seq_along)) - 1
+
+# Add a new factor column to the dataframe for the pitch group
+pitches$pitch_group <- as.factor(ifelse(pitches$pitch_count < 100, (pitches$pitch_count) %/% 10 + 1, 11))
+
+# Check the updated dataframe
+head(pitches, 250)
+
+
+```
+I want better names for the pitch_group levels
+```{r}
+pitches$pitch_bin <- pitches$pitch_group
+
+pitches$pitch_group <- NA
+
+pitches$pitch_group[pitches$pitch_bin == '1'] <- '0-9 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '2'] <- '10-19 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '3'] <- '20-29 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '4'] <- '30-39 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '5'] <- '40-49 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '6'] <- '50-59 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '7'] <- '60-69 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '8'] <- '70-79 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '9'] <- '80-89 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '10'] <- '90-99 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '11'] <- '> 100 Pitches'
+
+#MAke sure the order is correct. Really annoying if regression output isn't in ascending order
+sqldf("SELECT pitch_group, count(*) from pitches GROUP BY pitch_group ORDER BY pitch_group")
+
+```
+
+
+Check for mistakes. Sometimes the trackman doesn't change pitcherId when a new pitcher comes in. 
+```{r}
+library(sqldf)
+library(dplyr)
+sqldf("SELECT pitch_count, count(*) from pitches GROUP BY pitch_count")
+
+pitches[pitches$pitch_count > 120, ] %>% arrange(GameID)
+```
+
+
+Connor Lunn Seems incorrect. USC stats show Charles Acker went 8.2 in that game though. Probably just entirely incorrect.
+https://usctrojans.com/sports/baseball/stats/2019/ucla/boxscore/22237
+
+Tanner Bibee seems CORRECT. HE went 6 inning on that day with 7 ER
+Koski, Jon is correct. Went 6.1 inning
+Coates, Chandler is CORRECT. Went 8 innings
+
+Jordan MArks is not correct. MArks only went 6 (105 pitches). Will Wheeler went the last 3 https://upstatespartans.com/sports/baseball/stats/2019/radford/boxscore/630
+
+Max MEyer is correct Went 7 innings 123 pitches that game
+Kade Strowd is correct
+Charles HAll is correct 134 pitches
+Jordan wicks is correct 9 IP 129 pitches
+JAke AGnos is correct. 129
+MAx Meyer 4-26 correct 125
+Alek manoah 124, 126 on 5/23
+Bryce Elder correct 122
+Tanner Bibee correct again 9IP 133
+Zack thompson is correct 6.1IP
+
+Kyle Murphy Incorrect. only went 2 innings. Stiehl and josh winkler included in his count
+https://nuhuskies.com/sports/baseball/stats/2020/alabama/boxscore/10415
+
+Peyton W is correct
+
+Chandler Fochs is weird. THis dataset says his 123rd pitch was in the 4th inning. Brian Rumping took over after 56 from fochs. Definitely check out this game. 20220306-UNCCharlotte-1	https://goleathernecks.com/boxscore.aspx?id=12858&path=baseball
+
+Andrew PAtrick is fine 122
+JEff Wilson is fine 9IP 129
+
+The NA's (GameID 20220318-Lipscomb-1	) Isaiah Magwood started went 102, reid fagerstrom went 25, trevor andrews 14
+
+miles smith is fine
+Isaiah coupet is fine 124
+
+Julien hernandez did go 9, said he threw 118 though instead of 122 according to trackman (Maybe it counted warmup pitches?)
+D'Alessio, Andrew 6.0IP, 120 pitches instead of 125
+
+John Michael Bertrand FINE
+Cole larsen 9IP. FINE 6.2IP 122 on 4-23
+Justin PArker. Assumed FIne
+Fischer Paulsen. Assumed fine. 7.2IP
+Ivan MArtinez 6.1 IP 32 batters. Looks fine
+Jack perkins 128 FINE
+DAniel Hegarty FINE
+Joshua South. Assumed Fine
+
+Riley Egloff. ISSUE. He pitched 6 inning 112 pitches. Might include warm up throws or something. https://golobos.com/boxscore/nevada-12/
+
+Paul Skenes 8IP 123 pitches so slightly off. Trackman has 3 or 4 too many
+Peyton Wiggington 9IP 128 so trackman has two less
+
+Joshua South (5/14) is correct
+cam reeves assumed correct
+Taylor GRant correct
+
+Kirschsieper, Cole only threw 98 pitches. Ty Rybarczy came in for 23 and then Alex Vera finished with 51
+https://fightingillini.com/sports/baseball/stats/2022/penn-state/boxscore/23558
+
+JAcob cravey only went 6.2. Alex Goff Came in for the last 2.1
+https://samfordsports.com/boxscore.aspx?path=baseball&id=12292
+
+Tomasic, Connor only went 6.1 (100 pitches), Kyle Bischoff did the last 2.2 (40 pitches) https://bigten.org/boxscore.aspx?id=jhOYpxOXr63Fu7gkOpr76ZNub%2B51dDNCK2IY59m%2BpdLLZoN7nnqBYyrtcwLzCyhT71VLOajDDnc2bi%2BWgpv7bhQbjnwVxvuPMdtW9hhk%2Bk%2FeQOeE6RumhMwny5z6HwOz&path=baseball
+
+Tyler stultz (5-20) is off by 1 but whatever. (5-26) is correct
+
+Nick Dean only went five inning (87 pitches) Nigel Belgrave did 6 and 7. TOgether they threw 131 so theres ten missing or possibly correctly assigned to Belgrave   20220520-PurdueUniversity-1
+https://umterps.com/sports/baseball/stats/2022/purdue/boxscore/12805
+
+
+
+
+Why are most 120+ pitch outings in 2019 and 2022. Are there less pitches in general in 2020 and 2021 because of covid or something?
+
+
+```{r}
+sqldf("SELECT SUBSTRING(Date, 1, 4) as year, count(*), pitch_group FROM pitches group by SUBSTRING(Date, 1, 4), pitch_group ORDER BY SUBSTRING(Date, 1, 4), pitch_group")
+
+sqldf("SELECT SUBSTRING(Date, 1, 4) as year, count(*) FROM pitches group by SUBSTRING(Date, 1, 4) ORDER BY SUBSTRING(Date, 1, 4)")
+```
+
+Looks like theres harldy any in 2021. We'll keep this in mind.
+
+
+##Fix Mistakes FOund above.
+Since were fixing stuff, don't forget to redo the second and third code chunks to get accurate pitch_count and pitch_group columns
+
+
+Fix conner Lunn's 3-29-2019 outing. All 125 pitches assigned to him were thrown by Charles Acker. Actually, Charles Acker was in high school in 2019. It seems like the mistake might be in the Box Score on the USC website. Lunn and Acker were both number 35. I'll come back to this
+```{r}
+# Find Charles Ackers PitcherId
+pitches[pitches$PitcherTeam == 'USC_UPS' & substr(pitches$Date, 1, 4) == '2019', ]
+
+
+```
+Jordan MArks has 141 pitches in the 4-7-19 game but he only threw 105. We need to give the last 36 to Will Wheeler and reset the pitch count. GameID: 20190405-CarterMemorial-1
+```{r}
+#Find Will Wheelers PitcherId
+pitches[pitches$Pitcher == 'Wheeler, Will', ]
+pitches[pitches$PitcherTeam == 'USC_UPS' & substr(pitches$Date, 1, 4) == '2019', ]
+
+#No games for will wheeeler, I'll create a new pitcherId for him. First I'll make sure it's not being used
+pitches[(!(is.na(pitches$PitcherId)) & pitches$PitcherId == 1000025131), ]
+#1000025131 is good
+
+#Replace PitcherId for GameID, pitch_count, pitcherTeam 105through 141
+#Check entire rows first
+pitches[pitches$GameID == '20190405-CarterMemorial-1' & pitches$PitcherTeam == 'USC_UPS' & pitches$pitch_count >= 104, ]
+
+#Now Replace
+pitches$PitcherId[pitches$GameID == '20190405-CarterMemorial-1' & pitches$PitcherTeam == 'USC_UPS' & pitches$pitch_count >= 104] <- 1000025131
+#Replace Name too Why not
+pitches$Pitcher[pitches$GameID == '20190405-CarterMemorial-1' & pitches$PitcherTeam == 'USC_UPS' & pitches$pitch_count >= 104] <- 'Wheeler, Will'
+
+```
+
+Kyle Murphy's 153 pitches we're actually 70 for him, 69 for Stiehl, David  and hen 16 for Winkler, Josh. GAmeID 20200214-SwellThomasStadium-1
+
+Quite a discrepency between box score and trackman. I'g going to say Murphy got pulled after the 2nd batter in the 3rd inning. Pitch count 68 is first pitch for Stiehl, DAvid. He goes until end of 6th. Josh Winkler starts the sevent at pitch count 137 until the end
+
+```{r}
+# Look at all pitches for this game
+pitches[pitches$GameID == '20200214-SwellThomasStadium-1' & pitches$PitcherTeam == 'NOR_HUS', ]
+#Getting PitcherIds for stiehl and Winkler
+pitches[pitches$Pitcher == 'Stiehl, David', ]
+#673924
+pitches[pitches$Pitcher == 'Winkler, Josh', ]
+#1000025808
+
+
+
+#Replace Stiehls pitches' PitcherId for GameID, pitch_count, pitcherTeam 68 through 137
+#Check entire rows first
+pitches[pitches$GameID == '20200214-SwellThomasStadium-1' & pitches$PitcherTeam == 'NOR_HUS' & pitches$pitch_count >= 68 & pitches$pitch_count <= 136, ]
+#Now Replace
+pitches$PitcherId[pitches$GameID == '20200214-SwellThomasStadium-1' & pitches$PitcherTeam == 'NOR_HUS' & pitches$pitch_count >= 68 & pitches$pitch_count <= 136] <- 673924
+#Replace Name too Why not
+pitches$Pitcher[pitches$GameID == '20200214-SwellThomasStadium-1' & pitches$PitcherTeam == 'NOR_HUS' & pitches$pitch_count >= 68 & pitches$pitch_count <= 136] <- 'Stiehl, David'
+
+
+#Replace Winklers pitches' PitcherId for GameID, pitch_count, pitcherTeam 68 through 137
+#Check entire rows first
+pitches[pitches$GameID == '20200214-SwellThomasStadium-1' & pitches$PitcherTeam == 'NOR_HUS' & pitches$pitch_count >= 137, ]
+#Now Replace
+pitches$PitcherId[pitches$GameID == '20200214-SwellThomasStadium-1' & pitches$PitcherTeam == 'NOR_HUS' & pitches$pitch_count >= 137] <- 1000025808
+#Replace Name too Why not
+pitches$Pitcher[pitches$GameID == '20200214-SwellThomasStadium-1' & pitches$PitcherTeam == 'NOR_HUS' & pitches$pitch_count >= 137] <- 'Winkler, Josh'
+
+
+```
+
+Fix Chandler Fochs, GAmeID: 20220306-UNCCharlotte-1
+Chandler: 2.0IP, 56 pitches, Rumping, Bryan 1.2IP, 67 pitches; Jaynes, Will 1.0IP 47 pirches; Kratz, Caden 1.1, 27
+
+CHandler pulled after 56. Give Pitch_count 57 through upped bound to Rumping, Bryan
+
+```{r}
+# Look at all pitches for this game
+pitches[pitches$GameID == '20220306-UNCCharlotte-1' & pitches$PitcherTeam == 'WIU_LEA', ]
+
+#Find Rumping's pitcherId
+pitches[pitches$Pitcher == 'Rumping, Bryan', ]
+#1000076881
+
+#Replace PitcherId for GameID, pitch_count, pitcherTeam 57 and up
+#Check entire rows first
+pitches[pitches$GameID == '20220306-UNCCharlotte-1' & pitches$PitcherTeam == 'WIU_LEA' & pitches$pitch_count >= 57, ]
+
+#Now Replace
+pitches$PitcherId[pitches$GameID == '20220306-UNCCharlotte-1' & pitches$PitcherTeam == 'WIU_LEA' & pitches$pitch_count >= 57] <- 1000076881
+#Replace Name too Why not
+pitches$Pitcher[pitches$GameID == '20220306-UNCCharlotte-1' & pitches$PitcherTeam == 'WIU_LEA' & pitches$pitch_count >= 57] <- 'Rumping, Bryan'
+```
+Fix the NA pitcher Ids for this game 20220318-Lipscomb-1
+```{r}
+# Look at all pitches for this game
+pitches[pitches$GameID == '20220318-Lipscomb-1' & pitches$PitcherTeam == 'LIP_PRA', ]
+
+#Getting PitcherIds for stiehl and Winkler
+pitches[pitches$Pitcher == 'Kantola, Kaleb', ]
+#1000094167
+pitches[pitches$Pitcher == 'Williams, Patrick', ]
+#1000085191
+pitches[pitches$Pitcher == 'Newell, Will', ]
+#1000106568
+
+
+
+
+#Give first 68 piches to Kantola, Kaleb
+#Check entire rows first
+pitches[pitches$GameID == '20220318-Lipscomb-1' & pitches$PitcherTeam == 'LIP_PRA' & pitches$pitch_count <= 68, ]
+#Now Replace
+pitches$PitcherId[pitches$GameID == '20220318-Lipscomb-1' & pitches$PitcherTeam == 'LIP_PRA' & pitches$pitch_count <= 68] <- 1000094167
+#Replace Name too Why not
+pitches$Pitcher[pitches$GameID == '20220318-Lipscomb-1' & pitches$PitcherTeam == 'LIP_PRA' & pitches$pitch_count <= 68] <- 'Kantola, Kaleb'
+
+
+#Replace NA pitches' PitcherId for GameID, pitch_count, pitcherTeam 69 through 99
+#Check entire rows first
+pitches[pitches$GameID == '20220318-Lipscomb-1' & pitches$PitcherTeam == 'LIP_PRA' & pitches$pitch_count > 68 & pitches$pitch_count <= 99, ]
+#Now Replace
+pitches$PitcherId[pitches$GameID == '20220318-Lipscomb-1' & pitches$PitcherTeam == 'LIP_PRA' & pitches$pitch_count > 68 & pitches$pitch_count <= 99] <- 1000085191
+#Replace Name too Why not
+pitches$Pitcher[pitches$GameID == '20220318-Lipscomb-1' & pitches$PitcherTeam == 'LIP_PRA' & pitches$pitch_count > 68 & pitches$pitch_count <= 99] <- 'Williams, Patrick'
+
+#Replace last 50 or so pitcher ids with Newells
+#Check entire rows first
+pitches[pitches$GameID == '20220318-Lipscomb-1' & pitches$PitcherTeam == 'LIP_PRA' & pitches$pitch_count >= 100, ]
+#Now Replace
+pitches$PitcherId[pitches$GameID == '20220318-Lipscomb-1' & pitches$PitcherTeam == 'LIP_PRA' & pitches$pitch_count >= 100] <- 1000106568
+#Replace Name too Why not
+pitches$Pitcher[pitches$GameID == '20220318-Lipscomb-1' & pitches$PitcherTeam == 'LIP_PRA' & pitches$pitch_count >= 100] <- 'Newell, Will'
+
+```
+
+20220519-LubranoPark-1. COle got given way too many. 2 other guys came in. Ty Rybarczy came in for 23 and then Alex Vera finished with 51. Only 92 for cole
+```{r}
+# Look at all pitches for this game
+pitches[pitches$GameID == '20220519-LubranoPark-1' & pitches$PitcherTeam == 'ILL_ILL', ]
+
+#Ty Rybarczy id
+pitches[pitches$Pitcher == 'Rybarczyk, Ty', ]
+#1000084463
+#Alex Vera ID
+pitches[pitches$Pitcher == 'Vera, Alex', ]
+#1000050778
+
+#GIve TY all the pitches starting at pitch_count 94 up to 117
+#Check entire rows first
+pitches[pitches$GameID == '20220519-LubranoPark-1' & pitches$PitcherTeam == 'ILL_ILL' & pitches$pitch_count >= 94 & pitches$pitch_count <= 117, ]
+#Now Replace
+pitches$PitcherId[pitches$GameID == '20220519-LubranoPark-1' & pitches$PitcherTeam == 'ILL_ILL' & pitches$pitch_count >= 94 & pitches$pitch_count <= 117] <- 1000084463
+#Replace Name too Why not
+pitches$Pitcher[pitches$GameID == '20220519-LubranoPark-1' & pitches$PitcherTeam == 'ILL_ILL' & pitches$pitch_count >= 94 & pitches$pitch_count <= 117] <- 'Rybarczyk, Ty'
+
+#Give Alex vera everything above 117
+#Check entire rows first
+pitches[pitches$GameID == '20220519-LubranoPark-1' & pitches$PitcherTeam == 'ILL_ILL' & pitches$pitch_count > 117, ]
+#Now Replace
+pitches$PitcherId[pitches$GameID == '20220519-LubranoPark-1' & pitches$PitcherTeam == 'ILL_ILL' & pitches$pitch_count > 117] <- 1000050778
+#Replace Name too Why not
+pitches$Pitcher[pitches$GameID == '20220519-LubranoPark-1' & pitches$PitcherTeam == 'ILL_ILL' & pitches$pitch_count > 117] <- 'Vera, Alex'
+
+```
+
+
+20220519-SamfordUniversity-2. Cravey went 6.2IP 29BF, Goff, Alex went 2.1 9BF
+```{r}
+# Look at all pitches for this game
+pitches[pitches$GameID == '20220519-SamfordUniversity-2' & pitches$PitcherTeam == 'SAM_BUL', ]
+
+#Alex Goff id
+pitches[pitches$Pitcher == 'Goff, Alex', ]
+#1000057623
+
+#Evrything 98 and up goes to Goff
+#Check entire rows first
+pitches[pitches$GameID == '20220519-SamfordUniversity-2' & pitches$PitcherTeam == 'SAM_BUL' & pitches$pitch_count > 97, ]
+#Now Replace
+pitches$PitcherId[pitches$GameID == '20220519-SamfordUniversity-2' & pitches$PitcherTeam == 'SAM_BUL' & pitches$pitch_count > 97] <- 1000057623
+#Replace Name too Why not
+pitches$Pitcher[pitches$GameID == '20220519-SamfordUniversity-2' & pitches$PitcherTeam == 'SAM_BUL' & pitches$pitch_count > 97] <- 'Goff, Alex'
+
+```
+
+Tomasic, Connor only went 6.1 (100 pitches), Kyle Bischoff did the last 2.2 (40 pitches)
+```{r}
+# Look at all pitches for this game
+pitches[pitches$GameID == '20220519-UNebraska-1' & pitches$PitcherTeam == 'MIC_SPA', ]
+
+#Kyle's id
+pitches[pitches$Pitcher == 'Bischoff, Kyle', ]
+#1000014400
+
+#Evrything 78 and up goes to Goff
+#Check entire rows first
+pitches[pitches$GameID == '20220519-UNebraska-1' & pitches$PitcherTeam == 'MIC_SPA' & pitches$pitch_count > 100, ]
+#Now Replace
+pitches$PitcherId[pitches$GameID == '20220519-UNebraska-1' & pitches$PitcherTeam == 'MIC_SPA' & pitches$pitch_count > 100] <- 1000014400
+#Replace Name too Why not
+pitches$Pitcher[pitches$GameID == '20220519-UNebraska-1' & pitches$PitcherTeam == 'MIC_SPA' & pitches$pitch_count > 100] <- 'Bischoff, Kyle'
+
+```
+
+
+LAST ONE:
+Nick Dean only went five inning (87 pitches) Nigel Belgrave did 6 and 7. TOgether they threw 131 so theres ten missing or possibly correctly assigned to Belgrave   20220520-PurdueUniversity-1
+https://umterps.com/sports/baseball/stats/2022/purdue/boxscore/12805
+
+```{r}
+# Look at all pitches for this game
+pitches[pitches$GameID == '20220520-PurdueUniversity-1' & pitches$PitcherTeam == 'MAR_TER', ]
+
+#Nigel's id
+pitches[pitches$Pitcher == 'Belgrave, Nigel', ]
+#1000100709
+
+
+#Evrything 89 to 142 goes to NIgel
+#Check entire rows first
+pitches[pitches$GameID == '20220520-PurdueUniversity-1' & pitches$PitcherTeam == 'MAR_TER' & pitches$pitch_count > 88 & pitches$pitch_count < 143, ]
+#Now Replace
+pitches$PitcherId[pitches$GameID == '20220520-PurdueUniversity-1' & pitches$PitcherTeam == 'MAR_TER' & pitches$pitch_count > 88 & pitches$pitch_count < 143] <- 1000100709
+#Replace Name too Why not
+pitches$Pitcher[pitches$GameID == '20220520-PurdueUniversity-1' & pitches$PitcherTeam == 'MAR_TER' & pitches$pitch_count > 88 & pitches$pitch_count < 143] <- 'Belgrave, Nigel'
+```
+
+
+
+
+
+
+Unfortunatley there are probably other instances where the trackman operator didnt record a pitching change and some pitches early in a reliever's outing look like they came late in the starters. We caught the worst cases where it put pitchers above 120 pitches but there could be more. I don't think it's feasible to look through 1.2 million pitches and double check them all.
+
+
+I'm going to runthe chunks that assign pitch counts again now that the pitcher IDs are accurate
+
+Add a column that specifies how many pitches a pitcher has thrown
+```{r}
+
+pitches$pitch_count <- with(pitches, ave(seq_along(paste(GameID, PitcherId)), paste(GameID, PitcherId), FUN = seq_along)) - 1
+
+# Add a new factor column to the dataframe for the pitch group
+pitches$pitch_group <- as.factor(ifelse(pitches$pitch_count < 100, (pitches$pitch_count) %/% 10 + 1, 11))
+
+# Check the updated dataframe
+head(pitches, 250)
+
+
+```
+
+I want better names for the pitch_group levels
+```{r}
+pitches$pitch_bin <- pitches$pitch_group
+
+pitches$pitch_group <- NA
+
+pitches$pitch_group[pitches$pitch_bin == '1'] <- '0-9 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '2'] <- '10-19 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '3'] <- '20-29 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '4'] <- '30-39 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '5'] <- '40-49 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '6'] <- '50-59 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '7'] <- '60-69 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '8'] <- '70-79 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '9'] <- '80-89 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '10'] <- '90-99 Pitches'
+pitches$pitch_group[pitches$pitch_bin == '11'] <- 'More Than 100 Pitches'
+
+#MAke sure the order is correct. Really annoying if regression output isn't in ascending order
+sqldf("SELECT pitch_group, count(*) from pitches GROUP BY pitch_group ORDER BY pitch_group")
+
+```
+
+```{r}
+
+write.csv(pitches, 'C:\\Users\\Nick\\UCSB Baseball\\All_College_TM_19_22_Mistakes_Fixed_Pitchcounts_added.csv')
+
+```
+
+```{r}
+pitches <- read.csv('C:\\Users\\Nick\\UCSB Baseball\\All_College_TM_19_22_Mistakes_Fixed_Pitchcounts_added.csv')
+
+```
+#### THeres a chunk where i created a result column in the other markdown above the chunk below. Not sure if I did it again later on so I'm not including that for now
+
+turns out I'm already doing that further down so no need here
+
+Horizontal break is meaningless if theres no distinction made between lefties and righties
+```{r}
+
+pitches$Hbrk <- NA
+
+pitches$Hbrk[pitches$PitcherThrows == 'Right' | pitches$PitcherThrows == 'RIght'] <- -pitches$HorzBreak
+pitches$Hbrk[pitches$PitcherThrows == 'Left'] <- pitches$HorzBreak
+
+pitches %>% group_by(PitcherThrows) %>% summarise(n =n())
+
+```
+
+
+##Year Averages used for differences
+
+```{r}
+##Find averages for the dependent measures; Velovity, Spin Rate, Break,     Still try to do command, result based metric
+
+
+pitcher_year_group <- sqldf("select PitcherId, TaggedPitchType, SUBSTRING(Date, 1, 4) as YEAR, MAX(Pitcher) as PitcherName, MAX(PitcherTeam) as Team, AVG(RelSpeed) AS avg_RelSpeedYear, AVG(SpinRate) AS avg_spinrateYear, AVG(InducedVertBReak) AS avg_IndVertBrkYear, AVG(Hbrk) As avg_HBrkYear, COUNT(*) as PitchesThrown FROM pitches  WHERE PitcherId is not null GROUP BY PitcherId, SUBSTRING(Date, 1, 4), TaggedPitchType ORDER BY COUNT(*) DESC")
+
+
+```
+
+Relevel Pitch_group. MAke 0-9 the baseline
+```{r}
+pitches$pitch_group <- relevel(factor(pitches$pitch_group), ref = '0-9 Pitches')
+
+```
+
+Next we have to merge it so that summary stats for each pitch type of each pitcher are included for in each row, later we'll also calculate differences between each individual pitch numbers and the averages
+
+```{r}
+pitches$YEAR = NA
+pitches$YEAR <- substr(pitches$Date, 0, 4)
+pitcherYearAvgs <- left_join(pitches, pitcher_year_group, on = c('PitcherId', 'YEAR'))
+head(pitcherYearAvgs, 50)
+
+```
+
+
+
+```{r}
+pitcherYearAvgs$RelSpeedDiffYear <- pitcherYearAvgs$RelSpeed - pitcherYearAvgs$avg_RelSpeedYear
+pitcherYearAvgs$VertBreakDiffYear <- pitcherYearAvgs$InducedVertBreak - pitcherYearAvgs$avg_IndVertBrkYear
+pitcherYearAvgs$HorzBreakDiffYear <- pitcherYearAvgs$Hbrk - pitcherYearAvgs$avg_HBrkYear
+pitcherYearAvgs$SpinRateDiffYear <- pitcherYearAvgs$SpinRate - pitcherYearAvgs$avg_spinrateYear
+```
+
+Year avgs would work, and might be better, for WHIP regressions and other results based tests.
+
+
+
+
+
+HAve to make individual dfs for each pitch type
+
+```{r}
+fastballsYear <- pitcherYearAvgs[pitcherYearAvgs$TaggedPitchType == 'Fastball', ]
+changeupsYear <- pitcherYearAvgs[pitcherYearAvgs$TaggedPitchType == 'ChangeUp', ]
+curveballsYear <- pitcherYearAvgs[pitcherYearAvgs$TaggedPitchType == 'Curveball', ]
+cuttersYear <- pitcherYearAvgs[pitcherYearAvgs$TaggedPitchType == 'Cutter', ]
+slidersYear <- pitcherYearAvgs[pitcherYearAvgs$TaggedPitchType == 'Slider', ]
+sinkersYear <- pitcherYearAvgs[pitcherYearAvgs$TaggedPitchType == 'Sinker', ]
+splittersYear <- pitcherYearAvgs[pitcherYearAvgs$TaggedPitchType == 'Splitter', ]
+
+
+```
+
+
+
+
+
+##Regressions
+
+###Continuous
+
+Fastballs
+```{r}
+fastballSpinRateYear <- lm(SpinRateDiffYear ~ pitch_count, data = fastballsYear)
+summary(fastballSpinRateYear)
+
+fastballRelSpeedYear <- lm(RelSpeedDiffYear ~ pitch_count, data = fastballsYear)
+summary(fastballRelSpeedYear)
+
+fastballVertBreakYear <- lm(VertBreakDiffYear ~ pitch_count, data = fastballsYear)
+summary(fastballVertBreakYear)
+
+fastballHorzBreakYear <- lm(HorzBreakDiffYear ~ pitch_count, data = fastballsYear)
+summary(fastballHorzBreakYear)
+
+```
+
+
+
+
+Change Up
+```{r}
+changeupSpinRateYear <- lm(SpinRateDiffYear ~ pitch_count, data = changeupsYear)
+summary(changeupSpinRateYear)
+changeupRelSpeedYear <- lm(RelSpeedDiffYear ~ pitch_count, data = changeupsYear)
+summary(changeupRelSpeedYear)
+changeupVertBreakYear <- lm(VertBreakDiffYear ~ pitch_count, data = changeupsYear)
+summary(changeupVertBreakYear)
+changeupHorzBreakYear <- lm(HorzBreakDiffYear ~ pitch_count, data = changeupsYear)
+summary(changeupHorzBreakYear)
+
+```
+Curveballs
+```{r}
+curveballSpinRateYear <- lm(SpinRateDiffYear ~ pitch_count, data = curveballsYear)
+summary(curveballSpinRateYear)
+curveballRelSpeedYear <- lm(RelSpeedDiffYear ~ pitch_count, data = curveballsYear)
+summary(curveballRelSpeedYear)
+curveballVertBreakYear <- lm(VertBreakDiffYear ~ pitch_count, data = curveballsYear)
+summary(curveballVertBreakYear)
+curveballHorzBreakYear <- lm(HorzBreakDiffYear ~ pitch_count, data = curveballsYear)
+summary(curveballHorzBreakYear)
+
+```
+CUtters
+```{r}
+cutterSpinRateYear <- lm(SpinRateDiffYear ~ pitch_count, data = cuttersYear)
+summary(cutterSpinRateYear)
+cutterlRelSpeedYear <- lm(RelSpeedDiffYear ~ pitch_count, data = cuttersYear)
+summary(cutterlRelSpeedYear)
+cutterVertBreakYear <- lm(VertBreakDiffYear ~ pitch_count, data = cuttersYear)
+summary(cutterVertBreakYear)
+cutterHorzBreakYear <- lm(HorzBreakDiffYear ~ pitch_count, data = cuttersYear)
+summary(cutterHorzBreakYear)
+
+```
+Sliders
+```{r}
+sliderSpinRateYear <- lm(SpinRateDiffYear ~ pitch_count, data = slidersYear)
+summary(sliderSpinRateYear)
+sliderlRelSpeedYear <- lm(RelSpeedDiffYear ~ pitch_count, data = slidersYear)
+summary(sliderlRelSpeedYear)
+sliderVertBreakYear <- lm(VertBreakDiffYear ~ pitch_count, data = slidersYear)
+summary(sliderVertBreakYear)
+sliderHorzBreakYear <- lm(HorzBreakDiffYear ~ pitch_count, data = slidersYear)
+summary(sliderHorzBreakYear)
+
+```
+
+Sinkers
+```{r}
+sinkerSpinRateYear <- lm(SpinRateDiffYear ~ pitch_count, data = sinkersYear)
+summary(sinkerSpinRateYear)
+sinkerlRelSpeedYear <- lm(RelSpeedDiffYear ~ pitch_count, data = sinkersYear)
+summary(sinkerlRelSpeedYear)
+sinkerVertBreakYear <- lm(VertBreakDiffYear ~ pitch_count, data = sinkersYear)
+summary(sinkerVertBreakYear)
+sinkerHorzBreakYear <- lm(HorzBreakDiffYear ~ pitch_count, data = sinkersYear)
+summary(sinkerHorzBreakYear)
+
+```
+
+
+##Factor Level (Pitch_groups)
+
+
+
+
+Fastballs
+
+```{r}
+fastballSpinRateBinYear <- lm(SpinRateDiffYear ~ pitch_group, data = fastballsYear)
+summary(fastballSpinRateBinYear)
+#fastballSR <- 
+as.data.frame(fastballSpinRateBinYear$coefficients)
+
+fastballRelSpeedBinYear <- lm(RelSpeedDiffYear ~ pitch_group, data = fastballsYear)
+summary(fastballRelSpeedBinYear)
+#
+as.data.frame(fastballRelSpeedBinYear$coefficients)
+
+fastballVertBreakBinYear <- lm(VertBreakDiffYear ~ pitch_group, data = fastballsYear)
+summary(fastballVertBreakBinYear)
+#fastballV <- 
+as.data.frame(fastballVertBreakBinYear$coefficients)
+
+fastballHorzBreakBinYear <- lm(HorzBreakDiffYear ~ pitch_group, data = fastballsYear)
+summary(fastballHorzBreakBinYear)
+#fastballH <- 
+as.data.frame(fastballHorzBreakBinYear$coefficients)
+
+
+```
+
+
+```{r}
+changeupSpinRateBinYear <- lm(SpinRateDiffYear ~ pitch_group, data = changeupsYear)
+summary(changeupSpinRateBinYear)
+#
+as.data.frame(changeupSpinRateBinYear$coefficients)
+
+changeupRelSpeedBinYear <- lm(RelSpeedDiffYear ~ pitch_group, data = changeupsYear)
+summary(changeupRelSpeedBinYear)
+#
+as.data.frame(changeupRelSpeedBinYear$coefficients)
+
+changeupVertBreakBinYear <- lm(VertBreakDiffYear ~ pitch_group, data = changeupsYear)
+summary(changeupVertBreakBinYear)
+#
+as.data.frame(changeupVertBreakBinYear$coefficients)
+
+changeupHorzBreakBinYear <- lm(HorzBreakDiffYear ~ pitch_group, data = changeupsYear)
+summary(changeupHorzBreakBinYear)
+#
+as.data.frame(changeupHorzBreakBinYear$coefficients)
+```
+Curveballs
+```{r}
+curveballSpinRateBinYear <- lm(SpinRateDiffYear ~ pitch_group, data = curveballsYear)
+summary(curveballSpinRateBinYear)
+#
+as.data.frame(curveballSpinRateBinYear$coefficients)
+
+curveballRelSpeedBinYear <- lm(RelSpeedDiffYear ~ pitch_group, data = curveballsYear)
+summary(curveballRelSpeedBinYear)
+#
+as.data.frame(curveballRelSpeedBinYear$coefficients)
+
+curveballVertBreakBinYear <- lm(VertBreakDiffYear ~ pitch_group, data = curveballsYear)
+summary(curveballVertBreakBinYear)
+#
+as.data.frame(curveballVertBreakBinYear$coefficients)
+
+
+curveballHorzBreakBinYear <- lm(HorzBreakDiffYear ~ pitch_group, data = curveballsYear)
+summary(curveballHorzBreakBinYear)
+#
+as.data.frame(curveballHorzBreakBinYear$coefficients)
+```
+
+Cutters
+```{r}
+cutterSpinRateBinYear <- lm(SpinRateDiffYear ~ pitch_group, data = cuttersYear)
+summary(cutterSpinRateBinYear)
+#
+as.data.frame(cutterSpinRateBinYear$coefficient)
+
+cutterRelSpeedBinYear <- lm(RelSpeedDiffYear ~ pitch_group, data = cuttersYear)
+summary(cutterRelSpeedBinYear)
+#
+as.data.frame(cutterRelSpeedBinYear$coefficient)
+
+cutterVertBreakBinYear <- lm(VertBreakDiffYear ~ pitch_group, data = cuttersYear)
+summary(cutterVertBreakBinYear)
+#
+as.data.frame(cutterVertBreakBinYear$coefficient)
+
+cutterHorzBreakBinYear <- lm(HorzBreakDiffYear ~ pitch_group, data = cuttersYear)
+summary(cutterHorzBreakBinYear)
+#
+as.data.frame(cutterHorzBreakBinYear$coefficient)
+```
+
+Sliders
+```{r}
+sliderSpinRateBinYear <- lm(SpinRateDiffYear ~ pitch_group, data = slidersYear)
+summary(sliderSpinRateBinYear)
+#
+as.data.frame(sliderSpinRateBinYear$coefficient)
+
+sliderRelSpeedBinYear <- lm(RelSpeedDiffYear ~ pitch_group, data = slidersYear)
+summary(sliderRelSpeedBinYear)
+#
+as.data.frame(sliderRelSpeedBinYear$coefficient)
+
+sliderVertBreakBinYear <- lm(VertBreakDiffYear ~ pitch_group, data = slidersYear)
+summary(sliderVertBreakBinYear)
+#
+as.data.frame(sliderVertBreakBinYear$coefficient)
+
+
+sliderHorzBreakBinYear <- lm(HorzBreakDiffYear ~ pitch_group, data = slidersYear)
+summary(sliderHorzBreakBinYear)
+#
+as.data.frame(sliderHorzBreakBinYear$coefficient)
+```
+
+Sinkers
+```{r}
+sinkersSpinRateBinYear <- lm(SpinRateDiffYear ~ pitch_group, data = sinkersYear)
+summary(sinkersSpinRateBinYear)
+sinkersRelSpeedBinYear <- lm(RelSpeedDiffYear ~ pitch_group, data = sinkersYear)
+summary(sinkersRelSpeedBinYear)
+sinkersVertBreakBinYear <- lm(VertBreakDiffYear ~ pitch_group, data = sinkersYear)
+summary(sinkersVertBreakBinYear)
+sinkersHorzBreakBinYear <- lm(HorzBreakDiffYear ~ pitch_group, data = sinkersYear)
+summary(sinkersHorzBreakBinYear)
+
+```
+
+
+##Visualizing Regression Coefficients
+
+```{r, fig.height=12, fig.width=8}
+library(jtools)
+plot_summs(fastballSpinRateBinYear, changeupSpinRateBinYear, curveballSpinRateBinYear, cutterSpinRateBinYear, sliderSpinRateBinYear, model.names = c('Fastball', 'ChangeUp', 'Curveball', 'Cutter', 'Slider'), omit.coefs = c('(Intercept)', 'pitchBin9.+. 100+'))
+
+```
+Release Speed Summary Graph
+```{r, fig.height=12, fig.width=8}
+plot_summs(fastballRelSpeedBinYear, changeupRelSpeedBinYear, curveballRelSpeedBinYear, cutterRelSpeedBinYear, sliderRelSpeedBinYear, model.names = c('Fastball', 'ChangeUp', 'Curveball', 'Cutter', 'Slider'), omit.coefs = c('(Intercept)', 'pitchBin9.+. 100+'))
+
+```
+VErt Break
+```{r, fig.height=12, fig.width=8}
+plot_summs(fastballVertBreakBinYear, changeupVertBreakBinYear, curveballVertBreakBinYear, cutterVertBreakBinYear, sliderVertBreakBinYear, model.names = c('Fastball', 'ChangeUp', 'Curveball', 'Cutter', 'Slider'), omit.coefs = c('(Intercept)', 'pitchBin9.+. 100+'))
+
+```
+Horz Break
+
+```{r, fig.height=12, fig.width=8}
+plot_summs(fastballHorzBreakBinYear, changeupHorzBreakBinYear, curveballHorzBreakBinYear, cutterHorzBreakBinYear, sliderHorzBreakBinYear, model.names = c('Fastball', 'ChangeUp', 'Curveball', 'Cutter', 'Slider'), omit.coefs = c('(Intercept)', 'pitchBin9.+. 100+'))
+```
+
+
+
+
+
+
+
+# Regressing against WHIP and FIP
+
+
+
+## Add column for ruesult of play
+```{r}
+data1ac <- sqldf("select 
+               CASE WHEN PitchCall = 'InPlay' THEN TaggedHitType
+               WHEN PitchCall = 'BallCalled' AND KorBB = 'Walk' THEN KorBB 
+               WHEN PitchCall = 'StrikeSwinging' AND KorBB = 'Strikeout' THEN 'SwingingStikeout'
+               WHEN PitchCall = 'StrikeCalled' AND KorBB = 'Strikeout' THEN 'StrikeoutLooking'
+               ELSE PitchCall END AS Result
+               FROM pitches" )
+pitches['Result'] = data1ac['Result']
+```
+
+THe . in the column name is causing problems. Let's fix that
+```{r}
+pitches$TopOrBottom <- pitches$Top.Bottom
+```
+
+
+I only want one row for each plate appearance. THe last one that shows how it ended.(With a hit, walk, home run, strikeout etc.)
+I can't think of many ways to do this other than another fat for loop. If its ordered by date I'll loop through it and compare each batterid to the next batter id. if they are different then I add that row to my new dataset
+```{r}
+intermediate_step <- sqldf("SELECT PitcherId, BatterTeam, GameID, PitcherTeam, Date, Inning, TopOrBottom, PAofInning, BatterId, Result, PlayResult, KorBB, pitch_count - PitchofPA + 1 AS CountatFirstPitch, PitchofPA from pitches ORDER BY GameID, BatterTeam, Inning, PAofInning ")
+
+
+length(intermediate_step$BatterId)
+
+#Well run into problems with the occasional batter without a BAtter ID (NA)
+#Therefore, I'm going to replace the NA batterIds it 0000 or something
+
+#First lets see how many there are
+mean(is.na(intermediate_step$BatterId))
+#looks like .026 percent. Thats not bad. It isnt a problem unless theres 2 consecuive batters with no id
+
+#I'm going to make NA BatterIds equal 999999
+intermediate_step$BatterId <- intermediate_step$BatterId %>% replace(is.na(.), 999999)
+
+
+last_pitches = intermediate_step %>%
+  group_by(GameID, Inning, BatterId, PAofInning) %>%
+  slice_tail(n=1) %>%
+  arrange(GameID, Inning, PitcherTeam, PAofInning)
+
+
+dim(last_pitches)
+```
+
+
+
+
+```{r}
+#Neew code chucnk just to take a look at last_pitches
+head(last_pitches, 300)
+```
+
+```{r}
+
+# Add a new factor column to the dataframe for the pitch group
+last_pitches$first_pitch_bin <- as.factor(ifelse(last_pitches$CountatFirstPitch < 100, (last_pitches$CountatFirstPitch) %/% 10 + 1, 11))
+
+# Check the updated dataframe
+head(last_pitches, 250)
+
+
+```
+
+
+```{r}
+#Let make a first_Pitch_group Column
+
+last_pitches$first_pitch_group <- NA
+
+last_pitches$first_pitch_group[last_pitches$first_pitch_bin == '1'] <- '0-9 pitches'
+last_pitches$first_pitch_group[last_pitches$first_pitch_bin == '2'] <- '10-19 pitches'
+last_pitches$first_pitch_group[last_pitches$first_pitch_bin == '3'] <- '20-29 pitches'
+last_pitches$first_pitch_group[last_pitches$first_pitch_bin == '4'] <- '30-39 pitches'
+last_pitches$first_pitch_group[last_pitches$first_pitch_bin == '5'] <- '40-49 pitches'
+last_pitches$first_pitch_group[last_pitches$first_pitch_bin == '6'] <- '50-59 pitches'
+last_pitches$first_pitch_group[last_pitches$first_pitch_bin == '7'] <- '60-69 pitches'
+last_pitches$first_pitch_group[last_pitches$first_pitch_bin == '8'] <- '70-79 pitches'
+last_pitches$first_pitch_group[last_pitches$first_pitch_bin == '9'] <- '80-89 pitches'
+last_pitches$first_pitch_group[last_pitches$first_pitch_bin == '10'] <- '90-99 pitches'
+last_pitches$first_pitch_group[last_pitches$first_pitch_bin == '11'] <- 'More Than 100 Pitches'
+
+#MAke sure the order is correct. Really annoying if regression output isn't in ascending order
+sqldf("SELECT first_pitch_group, count(*) from last_pitches GROUP BY first_pitch_group ORDER BY first_pitch_group")
+
+
+
+```
+
+Last Pitches is looking pretty good. I need a way to quanitfy the result of the play. Probably will do a walk column, hit column, total bases column
+
+```{r}
+last_pitches$result2 <- NA
+last_pitches$result3 <- NA
+
+last_pitches$result2 <- ifelse(!(is.na(last_pitches$PlayResult)) & last_pitches$PlayResult != 'Undefined', last_pitches$PlayResult, NA)
+
+last_pitches$result2 <- ifelse(!(is.na(last_pitches$KorBB)) & last_pitches$KorBB != 'Undefined', last_pitches$Result, last_pitches$result2)
+
+last_pitches$result2 <- ifelse(!(is.na(last_pitches$Result)) & last_pitches$Result == 'HitByPitch', last_pitches$Result, last_pitches$result2)
+
+last_pitches$result2 <- ifelse(is.na(last_pitches$result2), "###ISSUE###", last_pitches$result2)
+
+last_pitches$result3 <- ifelse(is.na(last_pitches$result2), last_pitches$Result, last_pitches$result3)
+```
+
+
+
+
+
+
+```{r}
+sqldf("SELECT result2, count(*) FROM last_pitches GROUP BY result2")
+
+```
+Fix the nonsense
+```{r}
+
+
+newdata <- last_pitches[(last_pitches$result2 %in% c('Double','Error','FieldersChoice', 'Fielderschoice', 'HitByPitch', 'HomeRun', 'Homerun', 'Out', 'Sacrifice', 'Single', 'StrikeoutLooking', 'SwingingStikeout', 'Triple', 'Walk')), ]
+
+newdata1 <- newdata
+
+newdata1$result2[newdata$result2 == 'Fielderschoice'] <- 'FieldersChoice'
+newdata1$result2[newdata$result2 == 'Homerun'] <- 'HomeRun'
+
+```
+
+
+if it does work let me write to csv real quick
+```{r}
+
+write.csv(newdata1, 'C:\\Users\\Nick\\UCSB Baseball\\NickAllCollegeTrackmanAtBatsNew.csv')
+
+```
+
+
+```{r}
+
+atBats <- read.csv('C:\\Users\\Nick\\UCSB Baseball\\NickAllCollegeTrackmanAtBatsNew.csv')
+
+```
+
+
+Now that we have atBats dataframe ready, lets run some regresssions on results based metrics WHIP, FIP
+
+
+
+#WHIP and FIP regressions
+
+
+##WHIP
+
+
+```{r}
+#Making some dummy columns
+library(fastDummies)
+lastPitches <- dummy_cols(atBats, select_columns = 'result2')
+```
+
+##WHIP regression
+
+```{r}
+lastPitches$walksPlusHits <- lastPitches$result2_Walk + lastPitches$result2_Single + lastPitches$result2_Double + lastPitches$result2_Triple + lastPitches$result2_HomeRun + lastPitches$result2_HitByPitch
+lastPitches$outs <- lastPitches$result2_StrikeoutLooking + lastPitches$result2_SwingingStikeout + lastPitches$result2_FieldersChoice + lastPitches$result2_Out + lastPitches$result2_Sacrifice
+```
+
+
+
+
+Ok lets try to group by firstPitchGroup and combine these dummy columns in a way that calculates opp average, whip, etc
+
+```{r}
+whip_bin_avgs <- sqldf("SELECT first_pitch_group, count(*),
+                   cast((sum(cast(walksPlusHits as float)) / sum(cast(outs as float)) * 3.00) as float) AS whip FROM lastPitches group by first_pitch_group")
+
+
+whip_bin_avgs
+```
+Probably should make another SQL querly like the one bove bt gets a pitchers individual whip so we can see if its higher when the pitch count is higher.
+Either way I'd need yet another query that groups At Bats in the lastPitches df by both picher and Pitch Count Bin
+
+```{r}
+whip_bin_pitcher_avgs <- sqldf("SELECT first_pitch_group, PitcherId, count(*) as numAtBats,
+                   cast((sum(cast(walksPlusHits as float)) / sum(cast(outs as float)) * 3.00) as float) AS whip_bin FROM lastPitches group by first_pitch_group, PitcherId ORDER BY count(*) DESC")
+
+
+
+whip_bin_pitcher_avgs_ten_plus <- whip_bin_pitcher_avgs[whip_bin_pitcher_avgs$numAtBats >= 4, ]
+```
+
+```{r}
+whip_pitcher_avgs <- sqldf("SELECT PitcherId, count(*),
+                   cast((sum(cast(walksPlusHits as float)) / sum(cast(outs as float)) * 3.00) as float) AS whip_avg FROM lastPitches group by PitcherId ORDER BY count(*) DESC")
+
+whip_pitcher_avgs
+```
+
+
+```{r}
+whipdf <- left_join(whip_bin_pitcher_avgs_ten_plus, whip_pitcher_avgs, on = 'PitcherId')
+whipdf$diff <- whipdf$whip_bin - whipdf$whip_avg
+```
+
+Linear regression whip diff against pitch bin
+```{r}
+whip_diff_mod <- lm(diff ~ first_pitch_group, data = whipdf, weights = numAtBats)
+summary(whip_diff_mod)
+as.data.frame(whip_diff_mod$coefficient)
+```
+
+
+
+
+
+##Fip regression
+Fip is just walks, homeruns and strikeouts. Let me google the formuler real quick
+```{r}
+lastPitches$BBFIP <- (lastPitches$result2_Walk + lastPitches$result2_HitByPitch) * 3.00
+lastPitches$HRFIP <- lastPitches$result2_HomeRun * 13.00
+lastPitches$KFIP <- lastPitches$result2_Strikeout * (-2.00)
+lastPitches$NUMERATOR <- (lastPitches$BBFIP + lastPitches$HRFIP + lastPitches$KFIP)*3
+```
+
+
+
+
+Ok lets try to group by firstPitchGroup and combine these dummy columns in a way that calculates opp average, whip, etc
+FIP constant 3.9 is whats being used
+```{r}
+fip_bin_avgs <- sqldf("SELECT first_pitch_group, count(*),
+                   sum(NUMERATOR)/sum(outs) + 3.90 AS fip FROM lastPitches group by first_pitch_group")
+
+
+fip_bin_avgs
+```
+Probably should make another SQL querly like the one bove bt gets a pitchers individual whip so we can see if its higher when the pitch count is higher. Maybe ill get that pitches whip with, say, 0-20 pitches and see if theres an increase when count is higher.
+Either way I'd need yet another query that groups At Bats in the lastPitches df by both picher and Pitch Count Bin
+
+```{r}
+fip_bin_pitcher_avgs <- sqldf("SELECT first_pitch_group, PitcherId, count(*) as numAtBats,
+                   sum(NUMERATOR)/sum(outs) + 3.90 AS fip_bin FROM lastPitches group by first_pitch_group, PitcherId ORDER BY count(*) DESC")
+
+
+
+fip_bin_pitcher_avgs_ten_plus <- fip_bin_pitcher_avgs[fip_bin_pitcher_avgs$numAtBats >= 4, ]
+```
+
+```{r}
+fip_pitcher_avgs <- sqldf("SELECT PitcherId, count(*),
+                   sum(NUMERATOR)/sum(outs) + 3.90 AS fip_avg FROM lastPitches group by PitcherId ORDER BY count(*) DESC")
+
+fip_pitcher_avgs
+```
+
+
+```{r}
+fipdf <- left_join(fip_bin_pitcher_avgs_ten_plus, fip_pitcher_avgs, on = 'PitcherId')
+fipdf$diff_fip <- fipdf$fip_bin - fipdf$fip_avg
+```
+
+Linear regression whip diff against pitch bin
+```{r}
+fip_diff_mod <- lm(diff_fip ~ first_pitch_group, data = fipdf, weights = numAtBats)
+summary(fip_diff_mod)
+as.data.frame(fip_diff_mod$coefficients)
+```
+
+#BABIP (Batting Average on BAlls In Play)
+
+
+
+```{r}
+
+lastPitches$BIP <- lastPitches$result2_Triple + lastPitches$result2_Single +lastPitches$result2_Double + lastPitches$result2_HomeRun + lastPitches$result2_FieldersChoice + lastPitches$result2_Out + lastPitches$result2_Sacrifice
+
+lastPitches$hits <- lastPitches$result2_Triple + lastPitches$result2_Single +lastPitches$result2_Double + lastPitches$result2_HomeRun
+
+
+```
+
+
+Get each pitchers BABIP for Abs starting in each bin
+```{r}
+babip_bin_pitcher_avgs <- sqldf("SELECT first_pitch_group, PitcherId, count(*) as numAtBats,
+                   sum(cast(hits as float))/sum(cast(BIP as float)) AS babip_bin FROM lastPitches group by first_pitch_group, PitcherId ORDER BY count(*) DESC")
+
+
+
+babip_bin_pitcher_avgs_ten_plus <- babip_bin_pitcher_avgs[babip_bin_pitcher_avgs$numAtBats >= 4, ]
+
+
+
+```
+Get the avg for each pitcher for all their batters faced
+
+```{r}
+babip_pitcher_avgs <- sqldf("SELECT PitcherId, count(*),
+                   sum(cast(hits as float))/sum(cast(BIP as float)) AS babip_avg FROM lastPitches group by PitcherId ORDER BY count(*) DESC")
+
+babip_pitcher_avgs
+```
+
+
+```{r}
+babipdf <- left_join(babip_bin_pitcher_avgs_ten_plus, babip_pitcher_avgs, on = 'PitcherId')
+babipdf$diff_babip <- babipdf$babip_bin - babipdf$babip_avg
+```
+
+Linear regression whip diff against pitch bin
+```{r}
+babip_diff_mod <- lm(diff_babip ~ first_pitch_group, data = babipdf, weights = numAtBats)
+summary(babip_diff_mod)
+as.data.frame(babip_diff_mod$coefficients)
+```
+Plot for FIP, WHip regressions
+
+```{r, fig.height=6, fig.width=6}
+library(jtools)
+plot_summs(whip_diff_mod, omit.coefs = c('(Intercept)'))
+
+
+
+```
+
+```{r, fig.height = 6, fig.width=6}
+library(jtools)
+plot_summs(fip_diff_mod, omit.coefs = c('(Intercept)'))
+```
